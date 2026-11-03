@@ -12,7 +12,7 @@ export default function AdminLogin() {
     e.preventDefault();
     if (username === 'admin' && password === 'admin123') {
       localStorage.setItem('isAdminAuth', 'true');
-      navigate('  /manajemen-data');
+      navigate('/portal-petugas/manajemen-data');
     } else {
       setError('Kredensial tidak valid. Silakan coba lagi.');
     }

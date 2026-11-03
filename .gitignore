@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+#backend
+backend_dashboard/*
+!backend_dashboard/main.py
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

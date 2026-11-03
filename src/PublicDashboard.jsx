@@ -4,6 +4,7 @@ import SummaryPanel from './component/SummaryPanel'; // Import komponen panel ba
 import BarChartComp from './component/BarChartComp';
 import AgeDistribution from './component/AgeDistribution';
 import LineChartComp from './component/LineChartComp';
+import { API_BASE_URL, API_HEADERS } from './config/api';
 
 export default function PublicDashboard() {
   const [data, setData] = useState(null);
@@ -11,7 +12,7 @@ export default function PublicDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/dashboard')
+    fetch(`${API_BASE_URL}/api/dashboard`, { headers: API_HEADERS })
       .then((res) => res.json())
       .then((json) => {
         setData(json);

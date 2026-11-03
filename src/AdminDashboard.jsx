@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL, API_HEADERS } from './config/api';
 import { 
   UploadCloud, CheckCircle2, AlertTriangle, LogOut, 
   RefreshCw, Layers, Sliders, SlidersHorizontal, 
@@ -59,8 +60,9 @@ export default function AdminDashboard() {
     formData.append('diseases_config', JSON.stringify(diseases));
 
     try {
-      const response = await fetch('http://localhost:8000/api/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
+        headers: API_HEADERS,
         body: formData,
       });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // <-- Pastikan useEffect diimpor
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, API_HEADERS } from './config/api';
 import { 
@@ -13,19 +13,31 @@ export default function AdminDashboard() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   // Konfigurasi Header
-  const [title, setTitle] = useState("Dashboard Surveilans Kasus Penyakit");
-  const [subtitle, setSubtitle] = useState("Rekam Medik Elektronik Puskesmas");
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [logo, setLogo] = useState("Hospital");
 
-  // State Dinamis (Preset 5 Penyakit Bawaan)
-  const [diseases, setDiseases] = useState([
-    { id: 'ispa', name: 'ISPA', codes: 'J00, J01, J02, J03, J04, J05, J06, J09, J10, J11, J12, J13, J14, J15, J16, J17, J18, J20, J21, J22', color: '#f97316' },
-    { id: 'diare', name: 'DIARE', codes: 'A00, A02, A03, A04, A06, A08, A09', color: '#10b981' },
-    { id: 'tbc', name: 'TUBERKULOSIS', codes: 'A15, A16, A17, A18, A19', color: '#8b5cf6' },
-    { id: 'konjungtivitis', name: 'KONJUNGTIVITIS', codes: 'H10, H11, H13', color: '#ef4444' },
-    { id: 'dm', name: 'DIABETES MELITUS', codes: 'E10, E11', color: '#3b82f6' }
-  ]);
+  // State Dinamis
+  const [diseases, setDiseases] = useState([]);
 
   const navigate = useNavigate();
+
+useEffect(() => {
+    // Ambil data konfigurasi terakhir dari backend saat halaman admin dimuat
+    fetch('http://localhost:8000/api/dashboard')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.metadata) {
+          setTitle(json.metadata.judul || "Dashboard Surveilans Kasus Penyakit");
+          setSubtitle(json.metadata.sumber || "Rekam Medik Elektronik Puskesmas");
+          setLogo(json.metadata.logo || "Hospital");
+        }
+        if (json.diseases_config && json.diseases_config.length > 0) {
+          setDiseases(json.diseases_config);
+        }
+      })
+      .catch((err) => console.error("Gagal memuat konfigurasi:", err));
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('isAdminAuth');
@@ -55,6 +67,7 @@ export default function AdminDashboard() {
     formData.append('file', selectedFile);
     formData.append('judul', title);
     formData.append('sumber', subtitle);
+    formData.append('logo', logo);
     
     // Kirim seluruh konfigurasi penyakit sebagai format JSON string
     formData.append('diseases_config', JSON.stringify(diseases));
@@ -122,6 +135,20 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Sub-judul / Sumber Data</label>
                   <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ikon / Logo Dashboard</label>
+                  <select 
+                    value={logo} 
+                    onChange={(e) => setLogo(e.target.value)} 
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white cursor-pointer"
+                  >
+                    <option value="Hospital">Bangunan Rumah Sakit (Default)</option>
+                    <option value="Activity">Garis Detak (Activity)</option>
+                    <option value="ShieldPlus">Tameng Medis (Shield)</option>
+                    <option value="HeartPulse">Detak Jantung (Heart Pulse)</option>
+                    <option value="Stethoscope">Stetoskop</option>
+                  </select>
                 </div>
               </div>
             </div>

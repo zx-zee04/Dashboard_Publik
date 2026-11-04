@@ -58,9 +58,9 @@ export default function PublicDashboard() {
       <Header 
         title={data.metadata?.judul} 
         subtitle={data.metadata?.sumber} 
-        lastUpdate={data.metadata?.tanggal_update} 
+        lastUpdate={data.metadata?.tanggal_update}
+        logoName={data.metadata?.logo} // <-- Tambahkan baris ini
       />
-
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         
         {/* 2. Selector Tabs Berbasis Teks (Dipindah ke atas Panel) */}

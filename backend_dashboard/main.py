@@ -8,7 +8,6 @@ import shutil
 import re
 import traceback
 from datetime import datetime
-from pathlib import Path
 
 app = FastAPI(title="Dashboard Surveilans API")
 
@@ -20,15 +19,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATA_FILE = Path(__file__).resolve().parent / "dashboard_data.json"
+DATA_FILE = "dashboard_data.json"
 
 # Struktur default kosong sebelum ada upload
 DEFAULT_DATA = {
     "metadata": {
         "tanggal_update": "Belum ada data",
         "sumber": "Sistem Informasi Rekam Medis",
-        "judul": "Dashboard Surveilans Penyakit"
+        "judul": "Dashboard Surveilans Penyakit",
+        "logo": "Hospital"
     },
+    # Tambahkan blok ini agar saat sistem kosong, ada preset default:
+    "diseases_config": [
+        {"id": "ispa", "name": "ISPA", "codes": "J00, J01, J02, J03, J04, J05, J06, J09, J10, J11, J12, J13, J14, J15, J16, J17, J18, J20, J21, J22", "color": "#f97316"},
+        {"id": "diare", "name": "DIARE", "codes": "A00, A02, A03, A04, A06, A08, A09", "color": "#10b981"},
+        {"id": "tbc", "name": "TUBERKULOSIS", "codes": "A15, A16, A17, A18, A19", "color": "#8b5cf6"},
+        {"id": "konjungtivitis", "name": "KONJUNGTIVITIS", "codes": "H10, H11, H13", "color": "#ef4444"},
+        {"id": "dm", "name": "DIABETES MELITUS", "codes": "E10, E11", "color": "#3b82f6"}
+    ],
     "kpi": [],
     "puskesmas": {},
     "tren_harian": {},
@@ -191,6 +199,7 @@ async def upload_excel(
     file: UploadFile = File(...),
     judul: str = Form("Dashboard Surveilans Kasus Penyakit"),
     sumber: str = Form("Rekam Medik Elektronik Puskesmas"),
+    logo: str = Form("Hospital"),
     diseases_config: str = Form(...) # Menerima JSON dari frontend
 ):
     temp_filename = f"temp_{int(datetime.now().timestamp())}_{file.filename}"
@@ -208,8 +217,11 @@ async def upload_excel(
         parsed_data["metadata"] = {
             "tanggal_update": datetime.now().strftime("%d %b %Y %H:%M"),
             "sumber": sumber,
-            "judul": judul
+            "judul": judul,
+            "logo": logo
         }
+        # Tambahkan konfigurasi filter admin ke dalam JSON agar bisa dibaca lagi nanti
+        parsed_data["diseases_config"] = config_list 
         
         # Timpa file JSON
         with open(DATA_FILE, "w", encoding="utf-8") as f:

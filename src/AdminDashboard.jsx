@@ -24,7 +24,7 @@ export default function AdminDashboard() {
 
 useEffect(() => {
     // Ambil data konfigurasi terakhir dari backend saat halaman admin dimuat
-    fetch('http://localhost:8000/api/dashboard')
+    fetch(`${API_BASE_URL}/api/dashboard`, { headers: API_HEADERS })
       .then((res) => res.json())
       .then((json) => {
         if (json.metadata) {

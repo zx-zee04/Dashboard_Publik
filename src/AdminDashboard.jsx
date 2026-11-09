@@ -132,8 +132,9 @@ useEffect(() => {
     formData.append('diseases_config', JSON.stringify(diseases));
 
     try {
-      const response = await fetch('http://localhost:8000/api/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
+        headers: API_HEADERS,
         body: formData,
       });
       

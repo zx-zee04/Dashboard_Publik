@@ -18,14 +18,13 @@ export default function PublicDashboard() {
 
   // Fungsi fetch dipisah agar bisa dipanggil saat dropdown berubah
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/dashboard`, { headers: API_HEADERS })
     setLoading(true);
     // Jika 'Semua Puskesmas', fetch normal. Jika spesifik, tambahkan parameter query.
     const url = selectedPuskesmas === 'Semua Puskesmas' 
-      ? 'http://localhost:8000/api/dashboard'
-      : `http://localhost:8000/api/dashboard?puskesmas=${encodeURIComponent(selectedPuskesmas)}`;
+      ? `${API_BASE_URL}/api/dashboard`
+      : `${API_BASE_URL}/api/dashboard?puskesmas=${encodeURIComponent(selectedPuskesmas)}`;
 
-    fetch(url)
+    fetch(url, { headers: API_HEADERS })
       .then((res) => res.json())
       .then((json) => {
         setData(json);

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, API_HEADERS } from './config/api';
 import { 
   UploadCloud, CheckCircle2, LogOut, RefreshCw, Sliders, 
-  Eye, Plus, Trash2, Database, LayoutTemplate, X, Palette, Edit3, Tag 
+  Eye, Plus, Trash2, Database, LayoutTemplate, X, Palette, Edit3
 } from 'lucide-react';
 
 const DISEASE_TEMPLATES = [
@@ -31,8 +31,8 @@ export default function AdminDashboard() {
 
   // State Modal & Form Editor
   const [modalView, setModalView] = useState('none'); // 'none', 'select_template', 'edit_form'
-  const [activeFormData, setActiveFormData] = useState(null); // Menyimpan data sementara saat diedit
-  const [tagInput, setTagInput] = useState(''); // Input sementara untuk ngetik ICD-10
+  const [activeFormData, setActiveFormData] = useState(null); 
+  const [tagInput, setTagInput] = useState(''); 
 
 useEffect(() => {
     // Ambil data konfigurasi terakhir dari backend saat halaman admin dimuat
@@ -58,7 +58,6 @@ useEffect(() => {
 
   // --- LOGIKA EDITOR CHIP / TAGS ---
   const handleOpenForm = (diseaseToEdit) => {
-    // Ubah string koma "A01, A02" menjadi array ['A01', 'A02']
     const initialTags = diseaseToEdit.codes 
       ? diseaseToEdit.codes.split(',').map(c => c.trim()).filter(Boolean)
       : [];
@@ -69,7 +68,6 @@ useEffect(() => {
   };
 
   const handleKeyDownTag = (e) => {
-    // Jika user tekan Enter atau Koma
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       const newTag = tagInput.trim().toUpperCase();
@@ -77,7 +75,7 @@ useEffect(() => {
       if (newTag && !activeFormData.tags.includes(newTag)) {
         setActiveFormData({ ...activeFormData, tags: [...activeFormData.tags, newTag] });
       }
-      setTagInput(''); // Kosongkan input
+      setTagInput('');
     }
   };
 
@@ -89,7 +87,6 @@ useEffect(() => {
   };
 
   const handleSaveForm = () => {
-    // Gabungkan kembali array tags menjadi string "A01, A02" untuk disimpan ke backend
     const finalCodes = activeFormData.tags.join(', ');
     const finalDisease = { 
       id: activeFormData.id, 
@@ -100,10 +97,8 @@ useEffect(() => {
 
     const isExist = diseases.find(d => d.id === finalDisease.id);
     if (isExist) {
-      // Update jika sudah ada
       setDiseases(diseases.map(d => d.id === finalDisease.id ? finalDisease : d));
     } else {
-      // Tambah baru
       setDiseases([...diseases, finalDisease]);
     }
     setModalView('none');
@@ -115,13 +110,55 @@ useEffect(() => {
     }
   };
 
-  // --- API HANDLERS ---
-  const handleUploadRawData = async () => { /* Logika sama seperti sebelumnya */ };
-  const handleSaveConfig = async () => { /* Logika sama seperti sebelumnya */ };
+  // --- API HANDLERS (TERPUSAT) ---
+  const handleProcessData = async (withFile = false) => {
+    setIsUploading(true);
+    setUploadSuccess(false);
+
+    const formData = new FormData();
+    
+    if (withFile) {
+      if (!selectedFile) {
+        alert("Pilih file Excel terlebih dahulu!");
+        setIsUploading(false);
+        return;
+      }
+      formData.append('file', selectedFile);
+    }
+    
+    formData.append('judul', title);
+    formData.append('sumber', subtitle);
+    formData.append('logo', logo);
+    formData.append('diseases_config', JSON.stringify(diseases));
+
+    try {
+      const response = await fetch('http://localhost:8000/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Gagal memproses data');
+      
+      setIsUploading(false);
+      
+      if (withFile) {
+        setUploadSuccess(true);
+        setSelectedFile(null);
+        setTimeout(() => setActiveTab('studio'), 1500);
+      } else {
+        alert("Berhasil! Dashboard publik telah diperbarui.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert(`Terjadi kesalahan: ${err.message}`);
+      setIsUploading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* Top Navbar & Tab Menu (Kode disederhanakan untuk contoh, biarkan sama seperti sebelumnya) */}
+      {/* Top Navbar */}
       <nav className="border-b border-slate-200 bg-white sticky top-0 z-30">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-3">
@@ -135,33 +172,50 @@ useEffect(() => {
         </div>
       </nav>
 
+      {/* Tab Menu */}
       <div className="bg-white border-b border-slate-200">
         <div className="mx-auto max-w-5xl px-6 flex gap-8">
-          <button onClick={() => setActiveTab('upload')} className={`flex items-center gap-2 py-4 border-b-2 text-sm font-semibold transition-colors ${activeTab === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500'}`}><Database size={16} /> Data Center</button>
-          <button onClick={() => setActiveTab('studio')} className={`flex items-center gap-2 py-4 border-b-2 text-sm font-semibold transition-colors ${activeTab === 'studio' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500'}`}><Palette size={16} /> Studio Visual</button>
+          <button onClick={() => setActiveTab('upload')} className={`flex items-center gap-2 py-4 border-b-2 text-sm font-semibold transition-colors ${activeTab === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}><Database size={16} /> Data Center</button>
+          <button onClick={() => setActiveTab('studio')} className={`flex items-center gap-2 py-4 border-b-2 text-sm font-semibold transition-colors ${activeTab === 'studio' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}><Palette size={16} /> Studio Visual</button>
         </div>
       </div>
 
       {/* Main Content */}
       <main className="mx-auto max-w-5xl px-6 py-8">
         
-        {/* --- TAB 1: UPLOAD (Tetap Sama) --- */}
+        {/* --- TAB 1: UPLOAD --- */}
         {activeTab === 'upload' && (
           <div className="max-w-2xl mx-auto space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm text-center">
               <h2 className="text-xl font-bold mb-2">Unggah Database Rekam Medis</h2>
               <p className="text-sm text-slate-500 mb-6">Sistem akan membuang kolom sensitif dan menyimpan format analitik.</p>
-              {/* Box Upload Sederhana */}
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-10 hover:border-blue-400">
+              
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-10 hover:border-blue-400 transition">
                 <UploadCloud size={32} className="text-blue-500 mb-4" />
                 <span className="font-semibold text-slate-800">{selectedFile ? selectedFile.name : 'Pilih file .xlsx'}</span>
-                <input type="file" accept=".xlsx" onChange={(e) => { if(e.target.files[0]) setSelectedFile(e.target.files[0]) }} className="hidden" />
+                <input type="file" accept=".xlsx" onChange={(e) => { if(e.target.files[0]) { setSelectedFile(e.target.files[0]); setUploadSuccess(false); } }} className="hidden" />
               </label>
+
+              {uploadSuccess && (
+                <div className="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm font-medium text-emerald-800">
+                  ✓ Berhasil! Data telah diamankan di server. Lanjut ke Studio Visual.
+                </div>
+              )}
+
+              <button
+                onClick={() => handleProcessData(true)}
+                disabled={!selectedFile || isUploading}
+                className={`mt-6 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold text-white transition ${
+                  !selectedFile || isUploading ? 'cursor-not-allowed bg-slate-300' : 'bg-slate-900 hover:bg-slate-800'
+                }`}
+              >
+                {isUploading ? <><RefreshCw size={16} className="animate-spin" /> Menyimpan...</> : 'Simpan ke Database Analitik'}
+              </button>
             </div>
           </div>
         )}
 
-        {/* --- TAB 2: STUDIO VISUAL BARU (Layout Kompak) --- */}
+        {/* --- TAB 2: STUDIO VISUAL --- */}
         {activeTab === 'studio' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
@@ -189,14 +243,19 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Tombol Simpan dipindah ke kiri agar menonjol */}
-              <button onClick={handleSaveConfig} className="flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition">
-                <CheckCircle2 size={18} /> Terapkan ke Publik
+              <button 
+                onClick={() => handleProcessData(false)} 
+                disabled={isUploading}
+                className={`flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold text-white shadow-sm transition ${
+                  isUploading ? 'cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {isUploading ? <><RefreshCw size={16} className="animate-spin" /> Menerapkan...</> : <><CheckCircle2 size={18} /> Terapkan ke Publik</>}
               </button>
             </div>
 
-            {/* Kolom Kanan: Daftar Penyakit Kompak */}
-            <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white flex flex-col shadow-sm overflow-hidden">
+            {/* Kolom Kanan: Daftar Penyakit */}
+            <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white flex flex-col shadow-sm overflow-hidden min-h-[400px]">
               <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
                 <div>
                   <h2 className="text-sm font-bold flex items-center gap-2"><Sliders size={16} className="text-blue-600"/> Filter Penyakit Aktif</h2>
@@ -239,7 +298,7 @@ useEffect(() => {
 
       </main>
 
-      {/* --- MODAL MULTIGUNA (Template & Editor) --- */}
+      {/* --- MODAL MULTIGUNA --- */}
       {modalView !== 'none' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-xl shadow-xl overflow-hidden animate-fade-in">
@@ -250,7 +309,6 @@ useEffect(() => {
               <button onClick={() => setModalView('none')} className="text-slate-400 hover:text-red-500"><X size={20} /></button>
             </div>
             
-            {/* VIEW: PILIH TEMPLATE */}
             {modalView === 'select_template' && (
               <div className="p-6 bg-slate-50 max-h-[400px] overflow-y-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -270,7 +328,6 @@ useEffect(() => {
               </div>
             )}
 
-            {/* VIEW: FORM EDITOR (Mode Chips/Tags) */}
             {modalView === 'edit_form' && activeFormData && (
               <div className="p-6">
                 <div className="flex gap-4 mb-4">
@@ -287,10 +344,9 @@ useEffect(() => {
                 <div className="mb-2">
                   <label className="flex items-center justify-between text-xs font-bold text-slate-500 mb-1">
                     <span>Kode ICD-10 (Filter Data)</span>
-                    <span className="font-normal text-slate-400">Ketik kode, lalu tekan Enter / Koma</span>
+                    <span className="font-normal text-slate-400">Ketik kode, lalu Enter / Koma</span>
                   </label>
                   
-                  {/* Area Input & Chips */}
                   <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-slate-200 bg-slate-50 min-h-[80px]">
                     {activeFormData.tags.map((tag, idx) => (
                       <span key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-100 text-blue-700 text-xs font-mono font-bold border border-blue-200">

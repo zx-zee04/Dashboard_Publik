@@ -21,9 +21,8 @@ app.add_middleware(
 )
 
 DATA_FILE = "dashboard_data.json"
-RAW_FILE = "database_bersih.xlsx" # Database yang sudah dipangkas NIK-nya
+RAW_FILE = "database_bersih.xlsx"
 
-# Struktur default kosong sebelum ada upload
 DEFAULT_DATA = {
     "metadata": {
         "tanggal_update": "Belum ada data",
@@ -38,10 +37,7 @@ DEFAULT_DATA = {
         {"id": "konjungtivitis", "name": "KONJUNGTIVITIS", "codes": "H10, H11, H13", "color": "#ef4444"},
         {"id": "dm", "name": "DIABETES MELITUS", "codes": "E10, E11", "color": "#3b82f6"}
     ],
-    "kpi": [],
-    "puskesmas": {},
-    "tren_harian": {},
-    "kelompok_usia": {}
+    "kpi": [], "puskesmas": {}, "tren_harian": {}, "kelompok_usia": {}
 }
 
 if not os.path.exists(DATA_FILE):
@@ -65,74 +61,50 @@ def build_regex_from_codes(codes_string):
     if not codes_list: return "^$"
     return '|'.join([re.escape(c) for c in codes_list])
 
-# --- FUNGSI BARU: PEMANGKASAN DATA SENSITIF (ETL) ---
 def sanitize_and_save_excel(input_path, output_path):
-    """
-    Membaca Excel mentah, MEMBUANG kolom sensitif (NIK, Nama, Alamat, dll),
-    dan hanya menyimpan kolom yang diperlukan untuk analitik.
-    """
+    """Membuang kolom sensitif dan menyimpan sebagai database_bersih.xlsx"""
     xls = pd.ExcelFile(input_path)
     sheets = [s for s in xls.sheet_names if s not in ['STATUS', 'DETAIL_HARI']]
-    
-    # Gunakan engine openpyxl untuk menulis file excel baru
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
         for sheet in sheets:
             try:
                 df = pd.read_excel(xls, sheet_name=sheet)
                 if df.empty: continue
-                
-                # Daftar kata kunci kolom yang AMAN untuk disimpan
                 safe_keywords = ['tanggal', 'jenis kelamin', 'umur', 'diagnosa', 'icd', 'kode']
-                
-                cols_to_keep = []
-                for col in df.columns:
-                    col_lower = str(col).lower().strip()
-                    # Hanya ambil kolom jika mengandung kata kunci aman
-                    if any(k in col_lower for k in safe_keywords):
-                        cols_to_keep.append(col)
-                
-                # Buat DataFrame baru hanya dengan kolom aman
-                clean_df = df[cols_to_keep]
-                clean_df.to_excel(writer, sheet_name=sheet, index=False)
-            except Exception as e:
-                print(f"[-] Gagal membersihkan sheet {sheet}: {str(e)}")
-                
+                cols_to_keep = [col for col in df.columns if any(k in str(col).lower().strip() for k in safe_keywords)]
+                df[cols_to_keep].to_excel(writer, sheet_name=sheet, index=False)
+            except Exception: pass
     xls.close()
 
-# --- FUNGSI LAMA: PEMROSESAN ANALITIK ---
-def process_excel_file(file_path, config_list):
+def process_excel_file(file_path, config_list, target_puskesmas=None):
     all_records = []
     xls = None
     try:
         xls = pd.ExcelFile(file_path)
-        puskesmas_sheets = xls.sheet_names
-        
-        for sheet in puskesmas_sheets:
+        for sheet in xls.sheet_names:
             try:
                 df = pd.read_excel(xls, sheet_name=sheet)
                 if df.empty: continue
-                
                 df.columns = df.columns.str.strip()
-                
-                # Cek kolom yang tersedia di database bersih
                 needed_cols = ['Tanggal', 'Jenis Kelamin', 'Umur Tahun', 'Diagnosa 1', 'ICD-X 1']
-                available = [c for c in needed_cols if c in df.columns]
-                
-                if available:
+                if any(c in df.columns for c in needed_cols): # Jika ada minimal 1 kolom valid
+                    available = [c for c in needed_cols if c in df.columns]
                     df_sub = df[available].copy()
                     df_sub['Puskesmas'] = sheet
                     all_records.append(df_sub)
-            except Exception:
-                continue
+            except Exception: continue
     finally:
-        if xls is not None:
-            xls.close()
+        if xls is not None: xls.close()
 
     if not all_records:
         raise ValueError("Data bersih kosong atau format kolom tidak sesuai.")
         
     merged_df = pd.concat(all_records, ignore_index=True)
-    
+    all_puskesmas_names = sorted(merged_df['Puskesmas'].dropna().unique().tolist())
+
+    if target_puskesmas and target_puskesmas != "Semua Puskesmas":
+        merged_df = merged_df[merged_df['Puskesmas'].str.lower() == target_puskesmas.lower()]
+
     diagnosa_series = (
         merged_df['Diagnosa 1'].fillna('').astype(str) + " " +
         (merged_df['ICD-X 1'].fillna('').astype(str) if 'ICD-X 1' in merged_df.columns else '')
@@ -149,7 +121,6 @@ def process_excel_file(file_path, config_list):
         pattern = build_regex_from_codes(dis['codes'])
         sub = merged_df[diagnosa_series.str.contains(pattern, regex=True)]
 
-        # 1. KPI
         gender_col = sub['Jenis Kelamin'].astype(str).str.strip().str.lower() if 'Jenis Kelamin' in sub.columns else pd.Series([])
         kpi_list.append({
             "id": d_id, "name": d_name, "total": int(len(sub)),
@@ -157,69 +128,67 @@ def process_excel_file(file_path, config_list):
             "female": int((gender_col == 'perempuan').sum()), "color": d_color
         })
 
-        # 2. Puskesmas
         puskesmas_dict[d_id] = sub['Puskesmas'].value_counts().reset_index().rename(columns={'Puskesmas': 'name', 'count': 'count'}).head(15).to_dict(orient='records') if not sub.empty else []
 
-        # 3. Tren
         if not sub.empty and 'Clean_Date' in sub.columns:
             valid_dates = sub.dropna(subset=['Clean_Date']).sort_values('Clean_Date')
             tren_harian_dict[d_id] = valid_dates.groupby(valid_dates['Clean_Date'].dt.strftime('%d %b'), sort=False)['Puskesmas'].count().reset_index().rename(columns={'Clean_Date': 'date', 'Puskesmas': 'count'}).tail(20).to_dict(orient='records') if not valid_dates.empty else []
         else: tren_harian_dict[d_id] = []
 
-        # 4. Usia
         age_counts = sub['Age_Group'].value_counts() if not sub.empty and 'Age_Group' in sub.columns else {}
         kelompok_usia_dict[d_id] = [{"group": grp, "count": int(age_counts.get(grp, 0))} for grp in age_order]
 
-    return {"kpi": kpi_list, "puskesmas": puskesmas_dict, "tren_harian": tren_harian_dict, "kelompok_usia": kelompok_usia_dict}
-
+    return {"kpi": kpi_list, "puskesmas": puskesmas_dict, "tren_harian": tren_harian_dict, "kelompok_usia": kelompok_usia_dict, "available_puskesmas": all_puskesmas_names}
 
 @app.get("/api/dashboard")
-def get_dashboard_data():
+def get_dashboard_data(puskesmas: Optional[str] = None):
+    config_data = DEFAULT_DATA
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return DEFAULT_DATA
-
-# --- API 1: HANYA UNTUK UPLOAD DAN PANGKAS NIK ---
-@app.post("/api/upload_raw")
-async def upload_raw_data(file: UploadFile = File(...)):
-    temp_filename = f"temp_{int(datetime.now().timestamp())}_{file.filename}"
+            config_data = json.load(f)
+            
+    if not os.path.exists(RAW_FILE):
+        return config_data
+        
     try:
-        # 1. Simpan file sementara
-        with open(temp_filename, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # 2. Bersihkan NIK/Nama dan simpan permanen sebagai 'database_bersih.xlsx'
-        sanitize_and_save_excel(temp_filename, RAW_FILE)
-        
-        return JSONResponse(content={"status": "success", "message": "Data disanitasi dan diamankan."})
+        diseases_config = config_data.get("diseases_config", [])
+        calculated_data = process_excel_file(RAW_FILE, diseases_config, target_puskesmas=puskesmas)
+        calculated_data["metadata"] = config_data.get("metadata", {})
+        calculated_data["diseases_config"] = diseases_config
+        return calculated_data
     except Exception as e:
-        traceback.print_exc()
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        # 3. Buang file mentah yang mengandung NIK
-        if os.path.exists(temp_filename):
-            try: os.remove(temp_filename)
-            except: pass
+        print(f"Error filtering dashboard: {e}")
+        return config_data
 
-# --- API 2: HANYA UNTUK CUSTOMISASI STUDIO VISUAL ---
-@app.post("/api/apply_config")
-async def apply_config(
-    judul: str = Form(...),
-    sumber: str = Form(...),
-    logo: str = Form(...),
+# --- API UPLOAD TERPUSAT KEMBALI ---
+@app.post("/api/upload")
+async def upload_excel(
+    file: Optional[UploadFile] = File(None),
+    judul: str = Form("Dashboard Surveilans Kasus Penyakit"),
+    sumber: str = Form("Rekam Medik Elektronik Puskesmas"),
+    logo: str = Form("Hospital"),
     diseases_config: str = Form(...) 
 ):
-    if not os.path.exists(RAW_FILE):
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Belum ada data Excel di server. Silakan upload terlebih dahulu di Tab Data Center."})
-        
     try:
         config_list = json.loads(diseases_config)
+
+        # 1. Jika ada file yang diupload, simpan sementara lalu bersihkan (Sanitize)
+        if file and file.filename:
+            temp_filename = f"temp_{int(datetime.now().timestamp())}_{file.filename}"
+            with open(temp_filename, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            
+            sanitize_and_save_excel(temp_filename, RAW_FILE)
+            
+            if os.path.exists(temp_filename):
+                os.remove(temp_filename)
         
-        # 1. Hitung ulang grafik berdasarkan filter penyakit baru menggunakan 'database_bersih.xlsx'
+        # 2. Pastikan file database_bersih.xlsx sudah ada
+        if not os.path.exists(RAW_FILE):
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Belum ada data Excel di server. Silakan upload terlebih dahulu."})
+
+        # 3. Proses data dan gabungkan dengan pengaturan
         parsed_data = process_excel_file(RAW_FILE, config_list)
-        
-        # 2. Sisipkan Metadata
         parsed_data["metadata"] = {
             "tanggal_update": datetime.now().strftime("%d %b %Y %H:%M"),
             "sumber": sumber,
@@ -228,11 +197,11 @@ async def apply_config(
         }
         parsed_data["diseases_config"] = config_list 
         
-        # 3. Timpa dashboard_data.json
+        # 4. Simpan ke JSON
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(parsed_data, f, indent=2)
 
         return JSONResponse(content={"status": "success"})
     except Exception as e:
         traceback.print_exc()
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})    
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})

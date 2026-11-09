@@ -4,13 +4,9 @@ import SummaryPanel from './component/SummaryPanel';
 import BarChartComp from './component/BarChartComp';
 import AgeDistribution from './component/AgeDistribution';
 import LineChartComp from './component/LineChartComp';
-<<<<<<< HEAD
 import { API_BASE_URL, API_HEADERS } from './config/api';
 import ExecutiveSummary from './component/ExecutiveSummary'; // <-- Import komponen baru
-=======
-import ExecutiveSummary from './component/ExecutiveSummary';
 import { MapPin } from 'lucide-react'; // <-- Import Ikon MapPin
->>>>>>> 92b31637d990e72049b6ff2b0da422a020bcad9a
 
 export default function PublicDashboard() {
   const [data, setData] = useState(null);
@@ -22,9 +18,7 @@ export default function PublicDashboard() {
 
   // Fungsi fetch dipisah agar bisa dipanggil saat dropdown berubah
   useEffect(() => {
-<<<<<<< HEAD
     fetch(`${API_BASE_URL}/api/dashboard`, { headers: API_HEADERS })
-=======
     setLoading(true);
     // Jika 'Semua Puskesmas', fetch normal. Jika spesifik, tambahkan parameter query.
     const url = selectedPuskesmas === 'Semua Puskesmas' 
@@ -32,7 +26,6 @@ export default function PublicDashboard() {
       : `http://localhost:8000/api/dashboard?puskesmas=${encodeURIComponent(selectedPuskesmas)}`;
 
     fetch(url)
->>>>>>> 92b31637d990e72049b6ff2b0da422a020bcad9a
       .then((res) => res.json())
       .then((json) => {
         setData(json);

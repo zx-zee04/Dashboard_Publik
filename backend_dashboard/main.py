@@ -8,6 +8,7 @@ import os
 import shutil
 import re
 import traceback
+import threading
 from datetime import datetime
 
 app = FastAPI(title="Dashboard Surveilans API")
@@ -22,6 +23,8 @@ app.add_middleware(
 
 DATA_FILE = "dashboard_data.json"
 RAW_FILE = "database_bersih.xlsx"
+dashboard_cache = {}
+dashboard_cache_lock = threading.Lock()
 
 DEFAULT_DATA = {
     "metadata": {
@@ -149,10 +152,23 @@ def get_dashboard_data(puskesmas: Optional[str] = None):
             
     if not os.path.exists(RAW_FILE):
         return config_data
-        
+            
     try:
         diseases_config = config_data.get("diseases_config", [])
-        calculated_data = process_excel_file(RAW_FILE, diseases_config, target_puskesmas=puskesmas)
+        cache_key = (
+            os.path.getmtime(RAW_FILE),
+            os.path.getmtime(DATA_FILE) if os.path.exists(DATA_FILE) else 0,
+            json.dumps(diseases_config, sort_keys=True),
+            puskesmas or "",
+        )
+        with dashboard_cache_lock:
+            calculated_data = dashboard_cache.get(cache_key)
+            if calculated_data is None:
+                calculated_data = process_excel_file(
+                    RAW_FILE, diseases_config, target_puskesmas=puskesmas
+                )
+                dashboard_cache.clear()
+                dashboard_cache[cache_key] = calculated_data
         calculated_data["metadata"] = config_data.get("metadata", {})
         calculated_data["diseases_config"] = diseases_config
         return calculated_data
@@ -200,6 +216,8 @@ async def upload_excel(
         # 4. Simpan ke JSON
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(parsed_data, f, indent=2)
+        with dashboard_cache_lock:
+            dashboard_cache.clear()
 
         return JSONResponse(content={"status": "success"})
     except Exception as e:

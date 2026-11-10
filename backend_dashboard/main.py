@@ -8,6 +8,7 @@ import os
 import shutil
 import re
 import traceback
+from pathlib import Path
 import threading
 from datetime import datetime
 
@@ -21,8 +22,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATA_FILE = "dashboard_data.json"
-RAW_FILE = "database_bersih.xlsx"
+BACKEND_DIR = Path(__file__).resolve().parent
+DATA_FILE = BACKEND_DIR / "dashboard_data.json"
+RAW_FILE = BACKEND_DIR / "database_bersih.xlsx"
 dashboard_cache = {}
 dashboard_cache_lock = threading.Lock()
 
@@ -190,7 +192,7 @@ async def upload_excel(
 
         # 1. Jika ada file yang diupload, simpan sementara lalu bersihkan (Sanitize)
         if file and file.filename:
-            temp_filename = f"temp_{int(datetime.now().timestamp())}_{file.filename}"
+            temp_filename = BACKEND_DIR / f"temp_{int(datetime.now().timestamp())}_{file.filename}"
             with open(temp_filename, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             

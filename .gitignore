@@ -17,6 +17,7 @@ dist-ssr
 #backend
 backend_dashboard/*
 !backend_dashboard/main.py
+!backend_dashboard/requirements.txt
 
 google_apps_script/*
 

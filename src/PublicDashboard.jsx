@@ -14,14 +14,23 @@ export default function PublicDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPuskesmas, setSelectedPuskesmas] = useState('Semua Puskesmas');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    const refreshWhenFocused = () => setRefreshKey((key) => key + 1);
+    window.addEventListener('focus', refreshWhenFocused);
+    return () => window.removeEventListener('focus', refreshWhenFocused);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
+    setError(null);
     const url = selectedPuskesmas === 'Semua Puskesmas' 
       ? `${API_BASE_URL}/api/dashboard`
       : `${API_BASE_URL}/api/dashboard?puskesmas=${encodeURIComponent(selectedPuskesmas)}`;
 
-    fetch(url, { headers: API_HEADERS })
+    fetch(url, { headers: API_HEADERS, signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`Gagal memuat data (HTTP ${res.status})`);
         return res.json();
@@ -31,11 +40,14 @@ export default function PublicDashboard() {
         setLoading(false);
       })
       .catch((err) => {
+        if (err.name === 'AbortError') return;
         console.error("Gagal mengambil data surveilans:", err);
         setError(err.message);
         setLoading(false);
       });
-  }, [selectedPuskesmas]);
+
+    return () => controller.abort();
+  }, [selectedPuskesmas, refreshKey]);
 
   if (loading && !data) {
     return (
@@ -57,12 +69,21 @@ export default function PublicDashboard() {
         <p className="text-xs text-slate-500 max-w-sm mt-1 mb-5">
           {error ? `Pesan: ${error}` : 'Belum ada data rekam medis yang diunggah ke server.'}
         </p>
-        <a 
-          href="/portal-petugas" 
-          className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition"
-        >
-          Buka Portal Petugas untuk Upload
-        </a>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setRefreshKey((key) => key + 1)}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition"
+          >
+            Coba Muat Ulang
+          </button>
+          <a 
+            href="/portal-petugas" 
+            className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition"
+          >
+            Buka Portal Petugas untuk Upload
+          </a>
+        </div>
       </div>
     );
   }

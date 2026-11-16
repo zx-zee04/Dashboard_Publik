@@ -28,7 +28,8 @@ function AdminAccessDenied() {
 
 function ProtectedAdminRoute({ children }) {
   const isAuth = localStorage.getItem('isAdminAuth') === 'true';
-  return isAuth ? children : <AdminAccessDenied />;
+  const token = localStorage.getItem('adminToken');
+  return isAuth && token ? children : <Navigate to="/portal-petugas" replace />;
 }
 
 export default function App() {

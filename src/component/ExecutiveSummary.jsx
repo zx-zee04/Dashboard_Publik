@@ -1,147 +1,234 @@
 import React, { useMemo } from 'react';
-import { Activity, MapPin, AlertCircle, Users } from 'lucide-react';
+import { Activity, Building2, Users2, TrendingUp, AlertCircle } from 'lucide-react';
 
-export default function ExecutiveSummary({ data }) {
-  // 1. Kalkulasi Total Global (Semua Penyakit)
-  const globalStats = useMemo(() => {
+export default function ExecutiveSummary({ data, onSelectDisease }) {
+  // 1. Kalkulasi Statistik Global
+  const stats = useMemo(() => {
     let total = 0, male = 0, female = 0;
-    data.kpi.forEach(item => {
-      total += (item.total || 0);
-      male += (item.male || 0);
-      female += (item.female || 0);
+    (data.kpi || []).forEach((item) => {
+      total += Number(item.total || 0);
+      male += Number(item.male || 0);
+      female += Number(item.female || 0);
     });
-    return { total, male, female };
+    const malePct = total > 0 ? Math.round((male / total) * 100) : 0;
+    const femalePct = total > 0 ? 100 - malePct : 0;
+    return { total, male, female, malePct, femalePct };
   }, [data.kpi]);
 
-  // 2. Data Komparasi Penyakit
-  const topDiseases = useMemo(() => {
-    return [...data.kpi].sort((a, b) => b.total - a.total);
+  // 2. Ranking Penyakit Terbanyak
+  const sortedDiseases = useMemo(() => {
+    return [...(data.kpi || [])].sort((a, b) => (b.total || 0) - (a.total || 0));
   }, [data.kpi]);
 
-  // 3. Leaderboard Top 7 Puskesmas Baban Kasus Tertinggi
+  // 3. Leaderboard Puskesmas
   const topPuskesmas = useMemo(() => {
-    const puskMap = {};
-    Object.values(data.puskesmas).forEach(list => {
-      list.forEach(p => {
-        puskMap[p.name] = (puskMap[p.name] || 0) + p.count;
+    const map = {};
+    Object.values(data.puskesmas || {}).forEach((list) => {
+      (list || []).forEach((p) => {
+        map[p.name] = (map[p.name] || 0) + Number(p.count || 0);
       });
     });
-    return Object.entries(puskMap)
+    return Object.entries(map)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 7); // Ambil 7 teratas
+      .slice(0, 7);
   }, [data.puskesmas]);
 
-  // Nilai maksimum untuk menghitung panjang persentase Bar
-  const maxDisease = topDiseases[0]?.total || 1;
-  const maxPusk = topPuskesmas[0]?.count || 1;
+  const topDisease = sortedDiseases[0];
+  const topFacility = topPuskesmas[0];
+  const maxPusk = topFacility?.count || 1;
+  const maxDisCount = topDisease?.total || 1;
+
+  const fmt = (n) => Number(n || 0).toLocaleString('id-ID');
 
   return (
-    <div className="space-y-6 animation-fade-in">
-      
-      {/* PANEL 1: Total Global (Grand Total) */}
-      <section className="relative overflow-hidden rounded-2xl bg-slate-900 p-8 shadow-md md:p-10">
-        {/* Hiasan Latar Belakang */}
-        <div className="absolute -right-10 -top-20 opacity-10">
-          <Activity size={250} className="text-white" />
-        </div>
+    <div className="space-y-6">
+
+      {/* 4 Kartu Metrik Ringkasan Teratas */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Total Keseluruhan Kasus</h2>
-            <div className="mt-2 flex items-baseline gap-3">
-              <span className="text-6xl font-black text-white md:text-7xl">
-                {globalStats.total.toLocaleString('id-ID')}
-              </span>
-              <span className="text-lg font-medium text-slate-400">Pasien Terlacak</span>
+        {/* Metrik 1: Total Pasien Terpantau */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Kasus Terpantau</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <Activity size={16} />
             </div>
           </div>
-
-          <div className="flex gap-6 border-t border-slate-700 pt-6 md:border-l md:border-t-0 md:pl-8 md:pt-0">
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-400">Laki-Laki</p>
-              <p className="text-3xl font-bold text-blue-400">{globalStats.male.toLocaleString('id-ID')}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-400">Perempuan</p>
-              <p className="text-3xl font-bold text-pink-400">{globalStats.female.toLocaleString('id-ID')}</p>
-            </div>
+          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
+            {fmt(stats.total)}
+          </p>
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="font-medium text-slate-700">{data.kpi?.length || 0}</span> kategori penyakit aktif
           </div>
         </div>
-      </section>
 
+        {/* Metrik 2: Penyakit Tertinggi */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kasus Tertinggi</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+              <TrendingUp size={16} />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 truncate" title={topDisease?.name}>
+            {topDisease?.name || '—'}
+          </p>
+          <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+            <span>{fmt(topDisease?.total)} kasus</span>
+            <span className="font-semibold text-slate-700">
+              {stats.total > 0 ? Math.round(((topDisease?.total || 0) / stats.total) * 100) : 0}% porsi
+            </span>
+          </div>
+        </div>
+
+        {/* Metrik 3: Fasilitas Terpadat */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Fasilitas Terbanyak</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+              <Building2 size={16} />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 truncate" title={topFacility?.name}>
+            {topFacility?.name ? `Pusk. ${topFacility.name}` : '—'}
+          </p>
+          <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+            <span>{fmt(topFacility?.count)} kunjungan</span>
+            <span className="font-semibold text-emerald-600">Peringkat 1</span>
+          </div>
+        </div>
+
+        {/* Metrik 4: Komposisi Gender Pasien */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Demografi Gender</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+              <Users2 size={16} />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between text-sm font-bold text-slate-900">
+            <span className="text-blue-600 font-semibold text-xs">L: {fmt(stats.male)} ({stats.malePct}%)</span>
+            <span className="text-rose-500 font-semibold text-xs">P: {fmt(stats.female)} ({stats.femalePct}%)</span>
+          </div>
+          <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="bg-blue-500 transition-all duration-500" style={{ width: `${stats.malePct}%` }} />
+            <div className="bg-rose-400 transition-all duration-500" style={{ width: `${stats.femalePct}%` }} />
+          </div>
+          <div className="mt-1.5 flex justify-between text-[11px] text-slate-400">
+            <span>Laki-laki</span>
+            <span>Perempuan</span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Grid Komparasi Dua Kolom */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        
-        {/* PANEL 2: Komparasi Penyakit Tertinggi */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
-            <AlertCircle size={20} className="text-red-500" />
-            <h3 className="font-bold text-slate-800">Distribusi Penyakit Dominan</h3>
+
+        {/* Kolom 1: Distribusi Beban Tiap Penyakit */}
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Distribusi Kasus Berdasarkan Penyakit</h2>
+              <p className="text-xs text-slate-500">Perbandingan jumlah pasien antar kategori penyakit</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+              {sortedDiseases.length} Penyakit
+            </span>
           </div>
-          
-          <div className="space-y-5">
-            {topDiseases.map((dis, idx) => (
-              <div key={dis.id}>
-                <div className="mb-1 flex justify-between text-sm">
-                  <span className="font-semibold text-slate-700">{idx + 1}. {dis.name}</span>
-                  <span className="font-bold text-slate-900">{Number(dis.total).toLocaleString('id-ID')}</span>
+
+          <div className="mt-5 space-y-4">
+            {sortedDiseases.map((dis) => {
+              const pct = stats.total > 0 ? Math.round(((dis.total || 0) / stats.total) * 100) : 0;
+              const barWidth = maxDisCount > 0 ? ((dis.total || 0) / maxDisCount) * 100 : 0;
+              return (
+                <div 
+                  key={dis.id} 
+                  onClick={() => onSelectDisease && onSelectDisease(dis.id)}
+                  className="group -mx-2 cursor-pointer rounded-xl p-2.5 transition hover:bg-slate-50"
+                  title="Klik untuk melihat detail penyakit ini"
+                >
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-3 w-3 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: dis.color }} />
+                      <span className="font-semibold text-slate-800 group-hover:text-blue-600 transition">
+                        {dis.name}
+                      </span>
+                      <span className="text-xs font-mono text-slate-400">({pct}%)</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-slate-900 tabular-nums">{fmt(dis.total)}</span>
+                      <span className="text-xs text-slate-400 ml-1">pasien</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full transition-all duration-700 ease-out"
+                      style={{
+                        width: `${barWidth}%`,
+                        backgroundColor: dis.color,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div 
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{ 
-                      width: `${(dis.total / maxDisease) * 100}%`,
-                      backgroundColor: dis.color 
-                    }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
-        {/* PANEL 3: Leaderboard Puskesmas */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
-            <MapPin size={20} className="text-blue-600" />
-            <h3 className="font-bold text-slate-800">Top 7 Puskesmas (Beban Kasus Tertinggi)</h3>
+        {/* Kolom 2: Leaderboard Beban Kasus Fasilitas Kesehatan */}
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Fasilitas Kesehatan Teratas</h2>
+              <p className="text-xs text-slate-500">Puskesmas dengan volume kunjungan diagnosa tertinggi</p>
+            </div>
+            <span className="text-xs font-medium text-slate-400">Top 7 Wilayah</span>
           </div>
 
-          <div className="space-y-4">
-            {topPuskesmas.map((pusk, idx) => (
-              <div key={idx} className="flex items-center gap-4">
-                {/* Ranking Badge */}
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                  idx === 0 ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' :
-                  idx === 1 ? 'bg-slate-200 text-slate-600 ring-1 ring-slate-300' :
-                  idx === 2 ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200' :
-                  'bg-slate-50 text-slate-400'
-                }`}>
-                  #{idx + 1}
-                </div>
-                
-                <div className="flex-1">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-bold text-slate-700 truncate max-w-[200px]">{pusk.name}</span>
-                    <span className="font-semibold text-slate-500">{Number(pusk.count).toLocaleString('id-ID')} pasien</span>
+          <div className="mt-5 space-y-3.5">
+            {topPuskesmas.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">Belum ada data puskesmas tersedia.</div>
+            ) : (
+              topPuskesmas.map((pusk, idx) => {
+                const barWidth = maxPusk > 0 ? (pusk.count / maxPusk) * 100 : 0;
+                return (
+                  <div key={pusk.name} className="flex items-center gap-3">
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                      idx === 0 ? 'bg-amber-100 text-amber-800 font-extrabold ring-1 ring-amber-300/60' :
+                      idx === 1 ? 'bg-slate-200 text-slate-700 font-bold' :
+                      idx === 2 ? 'bg-orange-100 text-orange-800 font-bold' :
+                      'bg-slate-100 text-slate-500 font-medium'
+                    }`}>
+                      {idx + 1}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-semibold text-slate-800 truncate">Puskesmas {pusk.name}</span>
+                        <span className="font-bold text-slate-900 tabular-nums ml-2 shrink-0">
+                          {fmt(pusk.count)} <span className="font-normal text-slate-400">pasien</span>
+                        </span>
+                      </div>
+
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-blue-600 transition-all duration-700 ease-out"
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div 
-                      className="h-full rounded-full bg-blue-500 transition-all duration-1000"
-                      style={{ width: `${(pusk.count / maxPusk) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {topPuskesmas.length === 0 && (
-              <p className="text-center text-sm text-slate-400 py-4">Data puskesmas belum tersedia.</p>
+                );
+              })
             )}
           </div>
         </section>
 
       </div>
+
     </div>
   );
 }

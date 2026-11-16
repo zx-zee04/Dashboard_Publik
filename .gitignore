@@ -16,6 +16,8 @@ dist-ssr
 backend_dashboard/*
 !backend_dashboard/main.py
 
+google_apps_script/*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

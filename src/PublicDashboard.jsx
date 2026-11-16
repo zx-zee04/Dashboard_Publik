@@ -1,18 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import HeaderComp from './component/HeaderComp';
 import SummaryPanel from './component/SummaryPanel';
 import BarChartComp from './component/BarChartComp';
 import AgeDistribution from './component/AgeDistribution';
 import LineChartComp from './component/LineChartComp';
-<<<<<<< HEAD
-import { API_BASE_URL, API_HEADERS } from './config/api';
-import ExecutiveSummary from './component/ExecutiveSummary'; // <-- Import komponen baru
-import { MapPin } from 'lucide-react'; // <-- Import Ikon MapPin
-=======
 import ExecutiveSummary from './component/ExecutiveSummary';
 import { MapPin, ChevronDown, RefreshCw, X, SlidersHorizontal } from 'lucide-react';
-import { API_BASE_URL } from './config';
->>>>>>> 4d72eb633cfe3e604f44fc2822f33584ff7288f8
+import { API_BASE_URL, API_HEADERS } from './config';
 
 export default function PublicDashboard() {
   const [data, setData] = useState(null);
@@ -21,17 +15,13 @@ export default function PublicDashboard() {
   const [error, setError] = useState(null);
   const [selectedPuskesmas, setSelectedPuskesmas] = useState('Semua Puskesmas');
 
-  // Load data satu kali di awal
   useEffect(() => {
     setLoading(true);
-    // Jika 'Semua Puskesmas', fetch normal. Jika spesifik, tambahkan parameter query.
     const url = selectedPuskesmas === 'Semua Puskesmas' 
       ? `${API_BASE_URL}/api/dashboard`
       : `${API_BASE_URL}/api/dashboard?puskesmas=${encodeURIComponent(selectedPuskesmas)}`;
 
     fetch(url, { headers: API_HEADERS })
-      .then((res) => res.json())
-    fetch(`${API_BASE_URL}/api/dashboard`)
       .then((res) => {
         if (!res.ok) throw new Error(`Gagal memuat data (HTTP ${res.status})`);
         return res.json();
@@ -45,23 +35,7 @@ export default function PublicDashboard() {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
-
-  // Filter instan di sisi Frontend (0 delay, backend tidak membaca ulang Excel)
-  const activeData = useMemo(() => {
-    if (!data) return null;
-    if (selectedPuskesmas === 'Semua Puskesmas' || !data.by_puskesmas || !data.by_puskesmas[selectedPuskesmas]) {
-      return data;
-    }
-    const puskData = data.by_puskesmas[selectedPuskesmas];
-    return {
-      ...data,
-      kpi: puskData.kpi || [],
-      puskesmas: puskData.puskesmas || {},
-      tren_harian: puskData.tren_harian || {},
-      kelompok_usia: puskData.kelompok_usia || {},
-    };
-  }, [data, selectedPuskesmas]);
+  }, [selectedPuskesmas]);
 
   if (loading && !data) {
     return (
@@ -93,8 +67,8 @@ export default function PublicDashboard() {
     );
   }
 
-  const activeKpi = activeData?.kpi?.find((item) => item.id === selectedDisease);
-  const trenData = activeKpi && activeData?.tren_harian ? (activeData.tren_harian[selectedDisease] || []) : [];
+  const activeKpi = data?.kpi?.find((item) => item.id === selectedDisease);
+  const trenData = activeKpi && data?.tren_harian ? (data.tren_harian[selectedDisease] || []) : [];
   const startDate = trenData.length > 0 ? trenData[0].date : '';
   const endDate = trenData.length > 0 ? trenData[trenData.length - 1].date : '';
   const currentYear = new Date().getFullYear();
@@ -133,7 +107,7 @@ export default function PublicDashboard() {
               <span>Ringkasan Eksekutif</span>
             </button>
 
-            {activeData.kpi.map((kpi) => {
+            {data.kpi.map((kpi) => {
               const isSelected = selectedDisease === kpi.id;
               return (
                 <button
@@ -201,7 +175,7 @@ export default function PublicDashboard() {
         {/* KONTEN UTAMA */}
         {selectedDisease === 'summary' ? (
           <ExecutiveSummary 
-            data={activeData} 
+            data={data}
             onSelectDisease={(id) => setSelectedDisease(id)} 
           />
         ) : (
@@ -216,7 +190,7 @@ export default function PublicDashboard() {
                 <BarChartComp
                   title={`Sebaran Kasus ${activeKpi.name} per Fasilitas Kesehatan`}
                   subtitle="Perbandingan jumlah penderita di masing-masing puskesmas"
-                  data={(activeData.puskesmas && activeData.puskesmas[selectedDisease]) || []}
+                  data={(data.puskesmas && data.puskesmas[selectedDisease]) || []}
                   barColor={activeKpi.color}
                 />
               )}
@@ -226,14 +200,14 @@ export default function PublicDashboard() {
                 <LineChartComp
                   title={`Tren Waktu Kasus ${activeKpi.name}`}
                   subtitle={`Fluktuasi harian pemeriksaan (${selectedPuskesmas})`}
-                  data={(activeData.tren_harian && activeData.tren_harian[selectedDisease]) || []}
+                  data={(data.tren_harian && data.tren_harian[selectedDisease]) || []}
                   lineColor={activeKpi.color}
                 />
 
                 <AgeDistribution
                   title={`Kelompok Usia Pasien (${activeKpi.name})`}
                   subtitle={`Stratifikasi demografi penderita (${selectedPuskesmas})`}
-                  data={(activeData.kelompok_usia && activeData.kelompok_usia[selectedDisease]) || []}
+                  data={(data.kelompok_usia && data.kelompok_usia[selectedDisease]) || []}
                 />
               </div>
 

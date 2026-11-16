@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -9,7 +9,11 @@ import shutil
 import re
 import traceback
 from pathlib import Path
+import base64
+import hashlib
+import hmac
 import threading
+import time
 from datetime import datetime
 
 app = FastAPI(title="Dashboard Surveilans API")
@@ -25,6 +29,10 @@ app.add_middleware(
 BACKEND_DIR = Path(__file__).resolve().parent
 DATA_FILE = BACKEND_DIR / "dashboard_data.json"
 RAW_FILE = BACKEND_DIR / "database_bersih.xlsx"
+AUTH_SECRET = os.getenv("DASHBOARD_AUTH_SECRET", "change-this-dashboard-secret")
+ADMIN_USERNAME = os.getenv("DASHBOARD_ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("DASHBOARD_ADMIN_PASSWORD", "admin123")
+TOKEN_TTL_SECONDS = 8 * 60 * 60
 dashboard_cache = {}
 dashboard_cache_lock = threading.Lock()
 
@@ -65,6 +73,34 @@ def build_regex_from_codes(codes_string):
     codes_list = [c.strip().upper() for c in codes_string.split(',') if c.strip()]
     if not codes_list: return "^$"
     return '|'.join([re.escape(c) for c in codes_list])
+
+def create_admin_token(username):
+    payload = f"{username}:{int(time.time()) + TOKEN_TTL_SECONDS}".encode()
+    encoded_payload = base64.urlsafe_b64encode(payload).decode().rstrip("=")
+    signature = hmac.new(
+        AUTH_SECRET.encode(), encoded_payload.encode(), hashlib.sha256
+    ).hexdigest()
+    return f"{encoded_payload}.{signature}"
+
+def require_admin(authorization: Optional[str] = Header(default=None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token admin diperlukan.")
+
+    try:
+        encoded_payload, received_signature = authorization[7:].split(".", 1)
+        expected_signature = hmac.new(
+            AUTH_SECRET.encode(), encoded_payload.encode(), hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(received_signature, expected_signature):
+            raise ValueError("signature")
+
+        payload = base64.urlsafe_b64decode(encoded_payload + "==").decode()
+        username, expires_at = payload.rsplit(":", 1)
+        if username != ADMIN_USERNAME or int(expires_at) < int(time.time()):
+            raise ValueError("expired")
+        return username
+    except (ValueError, TypeError, UnicodeDecodeError):
+        raise HTTPException(status_code=401, detail="Token admin tidak valid atau kedaluwarsa.")
 
 def sanitize_and_save_excel(input_path, output_path):
     """Membuang kolom sensitif dan menyimpan sebagai database_bersih.xlsx"""
@@ -154,6 +190,20 @@ def get_dashboard_data(puskesmas: Optional[str] = None):
             
     if not os.path.exists(RAW_FILE):
         return config_data
+
+@app.post("/api/auth/login")
+def login(credentials: dict):
+    username = str(credentials.get("username", "")).strip()
+    password = str(credentials.get("password", ""))
+    if not hmac.compare_digest(username, ADMIN_USERNAME) or not hmac.compare_digest(
+        password, ADMIN_PASSWORD
+    ):
+        raise HTTPException(status_code=401, detail="Username atau password salah.")
+    return {
+        "token": create_admin_token(username),
+        "username": username,
+        "expires_in": TOKEN_TTL_SECONDS,
+    }
             
     try:
         diseases_config = config_data.get("diseases_config", [])
@@ -185,8 +235,11 @@ async def upload_excel(
     judul: str = Form("Dashboard Surveilans Kasus Penyakit"),
     sumber: str = Form("Rekam Medik Elektronik Puskesmas"),
     logo: str = Form("Hospital"),
-    diseases_config: str = Form(...) 
+    custom_logo: str = Form(""),
+    diseases_config: str = Form(...),
+    authorization: Optional[str] = Header(default=None),
 ):
+    require_admin(authorization)
     try:
         config_list = json.loads(diseases_config)
 
@@ -211,7 +264,8 @@ async def upload_excel(
             "tanggal_update": datetime.now().strftime("%d %b %Y %H:%M"),
             "sumber": sumber,
             "judul": judul,
-            "logo": logo
+            "logo": logo,
+            "custom_logo": custom_logo,
         }
         parsed_data["diseases_config"] = config_list 
         

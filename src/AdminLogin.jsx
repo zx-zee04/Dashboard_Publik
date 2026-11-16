@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowLeft, Lock, User, AlertCircle, RefreshCw } from 'lucide-react';
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, API_HEADERS } from './config';
 
 export default function AdminLogin() {
   const [username, setUsername] = useState('');
@@ -19,6 +19,7 @@ export default function AdminLogin() {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
+          ...API_HEADERS,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -32,7 +33,7 @@ export default function AdminLogin() {
         throw new Error(data.detail || 'Kredensial tidak cocok. Silakan coba lagi.');
       }
 
-      // Simpan JWT Bearer Token yang diterbitkan oleh server
+      // Simpan Bearer Token yang diterbitkan oleh server
       localStorage.setItem('adminToken', data.token);
       localStorage.setItem('adminUser', data.username || 'admin');
       localStorage.setItem('isAdminAuth', 'true');

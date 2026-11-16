@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL, API_HEADERS } from './config/api';
+import { API_BASE_URL, API_HEADERS } from './config';
 import { 
   FileSpreadsheet, Sliders, Palette, Eye, LogOut, Menu, X, 
   Plus, Trash2, Edit3, CheckCircle2, AlertCircle, RefreshCw, 
   UploadCloud, ExternalLink, ShieldCheck, Database, Search, 
   ChevronRight, Sparkles, HelpCircle, Activity, Hospital, HeartPulse, Stethoscope
 } from 'lucide-react';
-import { API_BASE_URL } from './config';
 
 // Template Standar Surveilans Epidemiologi Kemenkes / SKDR
 const PRESET_TEMPLATES = [
@@ -53,9 +52,6 @@ export default function AdminDashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionFeedback, setActionFeedback] = useState(null); // { type: 'success' | 'error', message: string }
 
-useEffect(() => {
-    // Ambil data konfigurasi terakhir dari backend saat halaman admin dimuat
-    fetch(`${API_BASE_URL}/api/dashboard`, { headers: API_HEADERS })
   // State Modal / Drawer Diagnosa
   const [modalMode, setModalMode] = useState('none'); // 'none' | 'edit' | 'template'
   const [editingItem, setEditingItem] = useState(null);
@@ -64,7 +60,7 @@ useEffect(() => {
 
   // Fetch data awal saat dibuka
   const loadDashboardConfig = () => {
-    fetch(`${API_BASE_URL}/api/dashboard`)
+    fetch(`${API_BASE_URL}/api/dashboard`, { headers: API_HEADERS })
       .then((res) => res.json())
       .then((json) => {
         setDashboardData(json);
@@ -175,9 +171,9 @@ useEffect(() => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
-        headers: API_HEADERS,
         headers: {
-          'Authorization': `Bearer ${token}`
+          ...API_HEADERS,
+          'Authorization': `Bearer ${token}`,
         },
         body: formData,
       });

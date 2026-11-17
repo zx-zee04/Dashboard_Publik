@@ -68,8 +68,9 @@ export default function AdminDashboard() {
     setLoadingUsers(true);
     try {
       const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
-      const res = await fetch(`${API_HEADERS}/api/admin/users`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
         headers: {
+          ...API_HEADERS,
           'Authorization': `Bearer ${token}`
         }
       });

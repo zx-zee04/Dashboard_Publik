@@ -1,8 +1,35 @@
-import React from 'react';
-import { Hospital, Activity, ShieldCheck, HeartPulse, Stethoscope, Lock, ArrowUpRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Hospital, Activity, ShieldCheck, HeartPulse, Stethoscope, LogOut, Sliders, User } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function HeaderComp({ title, subtitle, lastUpdate, logoName, customLogo }) {
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const rawUser = localStorage.getItem('authUser');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        setCurrentUser(u);
+        if (u.role === 'admin' || localStorage.getItem('isAdminAuth') === 'true') {
+          setIsAdmin(true);
+        }
+      }
+    } catch {
+      // Abaikan jika parse gagal
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authUser');
+    localStorage.removeItem('isAdminAuth');
+    localStorage.removeItem('adminToken');
+    navigate('/login');
+  };
+
   const renderLogo = () => {
     if (customLogo) {
       return (
@@ -26,6 +53,10 @@ export default function HeaderComp({ title, subtitle, lastUpdate, logoName, cust
     );
   };
 
+  const initial = currentUser?.nama_lengkap 
+    ? currentUser.nama_lengkap.charAt(0).toUpperCase() 
+    : 'U';
+
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xs">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
@@ -43,22 +74,51 @@ export default function HeaderComp({ title, subtitle, lastUpdate, logoName, cust
           </div>
         </div>
 
-        {/* Informasi Status & Tombol Petugas */}
-        <div className="flex items-center gap-4">
-          <div className="hidden text-right md:block">
-            <span className="block text-[11px] font-medium text-slate-400">Pembaruan Terakhir</span>
+        {/* Informasi Pengguna & Kontrol Sesi */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="hidden text-right lg:block">
+            <span className="block text-[11px] font-medium text-slate-400">Pembaruan Data</span>
             <span className="text-xs font-semibold text-slate-700">{lastUpdate || 'Belum ada data'}</span>
           </div>
 
-          <Link
-            to="/portal-petugas"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-            title="Masuk ke Portal Petugas"
+          {/* Profil Pengguna Aktif */}
+          {currentUser && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2.5 py-1.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-[11px] font-bold text-white shadow-2xs">
+                {initial}
+              </div>
+              <div className="hidden sm:block text-left">
+                <span className="block text-xs font-bold text-slate-800 leading-tight">
+                  {currentUser.nama_lengkap || 'Pengguna'}
+                </span>
+                <span className="text-[10px] font-medium text-slate-400 capitalize">
+                  {currentUser.role === 'admin' ? 'Administrator' : 'Masyarakat'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Tombol Khusus Administrator (Hanya terlihat jika akun Admin) */}
+          {isAdmin && (
+            <Link
+              to="/portal-petugas/manajemen-data"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+              title="Buka Workspace Manajemen Petugas"
+            >
+              <Sliders size={13} />
+              <span className="hidden sm:inline">Workspace Petugas</span>
+            </Link>
+          )}
+
+          {/* Tombol Keluar Sesi */}
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
+            title="Keluar dari akun"
           >
-            <Lock size={12} className="text-slate-400" />
-            <span className="hidden sm:inline">Portal Petugas</span>
-            <ArrowUpRight size={12} className="text-slate-400" />
-          </Link>
+            <LogOut size={13} />
+            <span className="hidden sm:inline">Keluar</span>
+          </button>
         </div>
 
       </div>

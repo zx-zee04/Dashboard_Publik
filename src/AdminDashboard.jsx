@@ -5,7 +5,7 @@ import {
   FileSpreadsheet, Sliders, Palette, Eye, LogOut, Menu, X, 
   Plus, Trash2, Edit3, CheckCircle2, AlertCircle, RefreshCw, 
   UploadCloud, ExternalLink, ShieldCheck, Database, Search, 
-  ChevronRight, Sparkles, HelpCircle, Activity, Hospital, HeartPulse, Stethoscope
+  ChevronRight, Sparkles, HelpCircle, Activity, Hospital, HeartPulse, Stethoscope, Users
 } from 'lucide-react';
 
 // Template Standar Surveilans Epidemiologi Kemenkes / SKDR
@@ -57,6 +57,51 @@ export default function AdminDashboard() {
   const [editingItem, setEditingItem] = useState(null);
   const [chipInput, setChipInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // State Pemantauan Pengguna
+  const [userList, setUserList] = useState([]);
+  const [userStats, setUserStats] = useState({ total_users: 0, total_masyarakat: 0, total_admin: 0 });
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
+      const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Gagal memuat daftar pengguna.');
+      const data = await res.json();
+      setUserList(data.users || []);
+      setUserStats({
+        total_users: data.total_users || 0,
+        total_masyarakat: data.total_masyarakat || 0,
+        total_admin: data.total_admin || 0
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'pengguna') {
+      fetchUsers();
+    }
+  }, [activeTab]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearchQuery.trim()) return userList;
+    const q = userSearchQuery.toLowerCase();
+    return userList.filter(u => 
+      (u.nama_lengkap && u.nama_lengkap.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q))
+    );
+  }, [userList, userSearchQuery]);
 
   // Fetch data awal saat dibuka
   const loadDashboardConfig = () => {
@@ -378,6 +423,18 @@ export default function AdminDashboard() {
               <Palette size={16} className={activeTab === 'tampilan' ? 'text-blue-600' : 'text-slate-400'} />
               <span>Custom Tampilan Umum</span>
             </button>
+
+            <button
+              onClick={() => { setActiveTab('pengguna'); setIsMobileMenuOpen(false); setActionFeedback(null); }}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition ${
+                activeTab === 'pengguna'
+                  ? 'bg-blue-50 text-blue-700 font-extrabold ring-1 ring-blue-200/80'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Users size={16} className={activeTab === 'pengguna' ? 'text-blue-600' : 'text-slate-400'} />
+              <span>Daftar Pengguna</span>
+            </button>
           </nav>
         </div>
 
@@ -433,6 +490,7 @@ export default function AdminDashboard() {
                 {activeTab === 'import' && 'Import & Pembaruan Data Rekam Medis'}
                 {activeTab === 'diagnosa' && 'Master Kategori Kasus & Kode ICD-10'}
                 {activeTab === 'tampilan' && 'Kustomisasi Tampilan & Identitas'}
+                {activeTab === 'pengguna' && 'Pemantauan Akun & Daftar Pengguna'}
               </h1>
             </div>
           </div>
@@ -969,6 +1027,152 @@ export default function AdminDashboard() {
                 <div className="mt-6 rounded-xl bg-slate-50 p-3.5 border border-slate-100 text-xs text-slate-500">
                   💡 Tip: Anda bisa mengunggah logo resmi Dinas Kesehatan / Pemerintah Daerah agar dashboard terlihat lebih formal dan terpercaya.
                 </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* TAB 4: PEMANTAUAN AKUN & DAFTAR PENGGUNA */}
+          {/* ============================================================== */}
+          {activeTab === 'pengguna' && (
+            <div className="space-y-6">
+              
+              {/* Top Banner & Refresh */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                      <Users size={16} />
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900">Pemantauan Akun Pengguna</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Daftar masyarakat dan staf pengelola yang memiliki akses ke platform surveilans.
+                  </p>
+                </div>
+
+                <button
+                  onClick={fetchUsers}
+                  disabled={loadingUsers}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <RefreshCw size={14} className={loadingUsers ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+                  <span>Segarkan Data</span>
+                </button>
+              </div>
+
+              {/* 3 Kartu Ringkasan Statistik */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Pengguna Terdaftar</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-extrabold text-slate-900">{userStats.total_users}</span>
+                    <span className="text-xs font-semibold text-slate-400">Akun Aktif</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+                  <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">Akun Masyarakat</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-extrabold text-emerald-700">{userStats.total_masyarakat}</span>
+                    <span className="text-xs font-semibold text-slate-400">Pengunjung</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+                  <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">Akun Administrator</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-extrabold text-blue-700">{userStats.total_admin}</span>
+                    <span className="text-xs font-semibold text-slate-400">Pengelola</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabel Pengguna */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+                
+                {/* Search Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                  <h4 className="text-sm font-bold text-slate-900">Daftar Akun Terdaftar</h4>
+                  
+                  <div className="relative w-full sm:w-64">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      placeholder="Cari nama atau email..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2 pl-9 pr-3 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Table Component */}
+                <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/90 text-slate-500 border-b border-slate-200">
+                        <th className="py-3 px-4 font-bold w-12 text-center">No</th>
+                        <th className="py-3 px-4 font-bold">Nama Lengkap</th>
+                        <th className="py-3 px-4 font-bold">Alamat Email</th>
+                        <th className="py-3 px-4 font-bold">Peran Akses</th>
+                        <th className="py-3 px-4 font-bold">Tanggal Terdaftar</th>
+                        <th className="py-3 px-4 font-bold">Terakhir Login</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="py-8 text-center text-slate-400 font-semibold">
+                            {loadingUsers ? 'Memuat data pengguna...' : 'Tidak ada data pengguna yang cocok.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredUsers.map((u, idx) => (
+                          <tr key={u.id || idx} className="hover:bg-slate-50/60 transition">
+                            <td className="py-3.5 px-4 text-center font-bold text-slate-400">{idx + 1}</td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900">
+                              <div className="flex items-center gap-2.5">
+                                <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-extrabold ${
+                                  u.role === 'admin' 
+                                    ? 'bg-blue-100 text-blue-700' 
+                                    : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {u.nama_lengkap ? u.nama_lengkap.charAt(0).toUpperCase() : 'U'}
+                                </div>
+                                <span>{u.nama_lengkap}</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-slate-600 font-mono text-[11px]">
+                              {u.email}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                u.role === 'admin'
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              }`}>
+                                {u.role === 'admin' ? 'Administrator' : 'Masyarakat'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-500 font-medium">
+                              {u.created_at || '-'}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-500 font-medium">
+                              {u.last_login ? (
+                                <span className="font-semibold text-slate-700">{u.last_login}</span>
+                              ) : (
+                                <span className="text-slate-400 italic">Belum pernah</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
               </div>
 
             </div>

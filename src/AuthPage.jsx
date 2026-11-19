@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Lock, Mail, User, AlertCircle, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react';
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, API_HEADERS } from './config';
 
 export default function AuthPage() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -24,7 +24,7 @@ export default function AuthPage() {
       if (mode === 'login') {
         const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...API_HEADERS, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username: identifier.trim(),
             password: password,
@@ -53,7 +53,7 @@ export default function AuthPage() {
         // Mode Register
         const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...API_HEADERS, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nama_lengkap: namaLengkap.trim(),
             email: email.trim(),

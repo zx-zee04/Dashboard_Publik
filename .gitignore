@@ -12,14 +12,19 @@ dist
 dist-ssr
 *.local
 .env
-.env.*.local
+.env.*
+!.env.example
 
-#backend
-backend_dashboard/*
+# Native app files stay local; this repository publishes the web frontend.
+/android/
+/capacitor.config.*
+/scripts/init-android-signing.mjs
+
+# Backend and Google Apps Script stay local, separate from the web frontend.
+/backend_dashboard/
 !backend_dashboard/main.py
 !backend_dashboard/requirements.txt
-
-google_apps_script/*
+/google_apps_script/
 
 # Editor directories and files
 .vscode/*

@@ -37,11 +37,22 @@
 - [Tumpukan Teknologi](#tumpukan-teknologi)
 - [Petunjuk Pemasangan dan Operasional](#petunjuk-pemasangan-dan-operasional)
 - [Konfigurasi Lingkungan](#konfigurasi-lingkungan)
+- [Membangun aplikasi Android](#6-membangun-aplikasi-android)
 - [Kredensial Akses Standar](#kredensial-akses-standar)
 
 ---
 
 ## Arsitektur Sistem
+
+### Cakupan repository GitHub
+
+Repository ini menyimpan frontend website: kode React, aset publik, konfigurasi Vite/Vercel, serta dependensi npm. Aturan [.gitignore](./.gitignore) mengecualikan proyek Android, backend FastAPI, Google Apps Script, environment lokal, kunci signing, dan hasil build. Berkas lokal tersebut tetap dapat digunakan pada komputer pengembang, tetapi tidak tersedia saat repository di-clone.
+
+Untuk menjalankan website dari clone baru, gunakan `npm ci`, salin [.env.example](./.env.example) menjadi `.env`, isi `VITE_API_URL` dengan URL HTTPS backend yang sudah berjalan, lalu jalankan `npm run dev` atau `npm run build`. Pada hosting, isi variabel yang sama melalui pengaturan environment hosting. Backend tetap diperlukan untuk login dan data; mengunggah frontend saja tidak menjalankan backend.
+
+Perintah Android dan petunjuk backend di dokumen ini berlaku untuk lingkungan pengembang yang memiliki berkas lokal tersebut. Script Android masih tersedia dalam [package.json](./package.json) agar pengembangan lokal tetap dapat dilakukan. Cadangkan proyek Android dan kunci signing secara terpisah karena repository frontend ini tidak menyimpannya.
+
+Jika berkas backend pernah di-commit, `git rm --cached` hanya menghapusnya dari snapshot commit berikutnya; isi commit terdahulu tetap ada dalam riwayat Git.
 
 Aplikasi ini mengadopsi arsitektur *Decoupled Client-Server* dengan pemisahan tegas antara logika analitik backend dan lapisan penyajian frontend:
 
@@ -269,6 +280,82 @@ npm run build
 ```
 
 Berkas keluaran siap sebar akan disimpan pada direktori `dist/`.
+
+### 6. Membangun aplikasi Android
+
+Proyek Capacitor ini menggunakan Java 21. Pilihan JDK disimpan di [android/gradle.properties](./android/gradle.properties), sehingga Gradle memakai JDK bawaan Android Studio setiap kali dijalankan, termasuk dari terminal baru:
+
+```properties
+org.gradle.java.home=C:/Program Files/Android/Android Studio/jbr
+```
+
+Jika proyek dipindahkan ke komputer lain atau lokasi Android Studio berbeda, sesuaikan nilai tersebut ke direktori JDK 21 di komputer itu. Perintah Android dapat langsung dijalankan tanpa mengatur `$env:JAVA_HOME` atau `$env:Path` pada setiap terminal.
+
+#### APK untuk HP lain melalui internet (backend ngrok yang sama dengan website)
+
+Website dan Android memakai API FastAPI yang sama. Akun, data dashboard, serta hasil unggahan tetap disimpan di backend; APK berisi frontend. HP pengguna cukup terhubung ke internet, tanpa harus satu Wi-Fi dengan komputer backend.
+
+1. Jalankan backend dari direktori [backend_dashboard](./backend_dashboard) seperti saat menjalankan website. Direktori ini penting karena database dan berkas data backend memakai path relatif. Jika backend sudah aktif, gunakan proses yang sama.
+2. Jalankan tunnel ke **backend port 8000**, misalnya `ngrok http 8000`. Gunakan domain dev tetap milik akun ngrok. Komputer backend dan proses ngrok harus tetap menyala serta terhubung ke internet.
+3. Salin [.env.example](./.env.example) menjadi `.env` bila belum ada, lalu isi URL HTTPS yang ditampilkan ngrok:
+
+   ```dotenv
+   VITE_API_URL=https://domain-anda.ngrok-free.dev
+   ```
+
+   Gunakan URL dasar backend, tanpa `/api` di akhir. Jangan memakai URL frontend/Vercel. `.env` diabaikan Git; website yang dibangun pada layanan hosting perlu memiliki nilai `VITE_API_URL` yang sama di pengaturan hosting lalu dibangun ulang. Semua variabel `VITE_*` masuk ke frontend, jadi jangan isi dengan token ngrok atau rahasia backend.
+
+4. Sekali saja di komputer pembuat APK, siapkan kunci penandatanganan release:
+
+   ```powershell
+   npm run android:signing:init
+   ```
+
+   Perintah ini membuat `android/keystore/surveilans-release.p12` dan `android/keystore.properties` dengan kata sandi acak lokal, serta menolak menimpa berkas yang sudah ada. **Cadangkan kedua berkas secara pribadi**; jangan bagikan bersama APK atau masukkan ke Git. Pembaruan aplikasi harus ditandatangani dengan kunci yang sama.
+
+5. Dari direktori proyek, buat APK release bertanda tangan pada Windows:
+
+   ```powershell
+   npm run android:apk:release
+   ```
+
+   Perintah ini membangun frontend dalam mode `android-public`, memeriksa URL API, menyinkronkan aset ke Android, lalu menjalankan Gradle. Build ini mewajibkan domain HTTPS publik dan menolak URL kosong, HTTP, localhost, serta alamat IP. Pemeriksaan format tidak membuktikan tunnel sedang online. Hasilnya berada di [app-release.apk](./android/app/build/outputs/apk/release/app-release.apk).
+
+6. Bagikan **hanya APK** melalui unduhan atau berbagi berkas, lalu buka berkas tersebut di HP penerima dan izinkan pemasangan dari sumber itu jika diminta. Tidak perlu kabel USB. APK mendukung Android 7.0 atau lebih baru (`minSdkVersion 24`). Komputer backend dan ngrok harus tetap menyala agar login serta data berfungsi; untuk aplikasi yang tidak bergantung pada komputer, tempatkan backend pada server yang selalu aktif.
+
+`npm run android:apk` tetap membuat APK debug untuk pengujian. APK debug yang sudah terpasang harus dihapus sebelum memasang APK release karena sertifikatnya berbeda; data lokal aplikasi akan hilang, sedangkan akun dan data pada backend tetap ada. Untuk pembaruan release berikutnya, pertahankan kunci signing yang sama dan naikkan `versionCode` serta `versionName` di [app/build.gradle](./android/app/build.gradle) sebelum membangun APK baru.
+
+Untuk membangun sekaligus menjalankan pada emulator atau HP yang terhubung melalui USB:
+
+```powershell
+npm run android:run
+```
+
+Atau bangun/sinkronkan dahulu, kemudian gunakan perintah Capacitor langsung:
+
+```powershell
+npm run build:android
+npx cap run android
+```
+
+Tidak perlu lagi mengatur `$env:JAVA_HOME` atau `$env:Path`. `npx cap run android` sendiri hanya menyalin aset yang sudah dibangun, sehingga jalankan build publik lagi setelah mengubah kode, URL API, atau sebelumnya memakai mode emulator. URL API dimasukkan ke aset saat build; jika alamat backend berubah, bangun dan pasang ulang APK. Aplikasi tetap dapat dibuka saat backend mati, tetapi login dan data membutuhkan backend yang online.
+
+Login, registrasi, dashboard, daftar pengguna, dan unggahan menggunakan header `ngrok-skip-browser-warning` dari [src/config.js](./src/config.js). Backend saat ini mengizinkan CORS yang diperlukan untuk origin Capacitor `https://localhost`; origin tersebut adalah asal halaman aplikasi, sedangkan tujuan API tetap URL HTTPS ngrok.
+
+**Pemeriksaan dari HP:** matikan Wi-Fi dan gunakan data seluler, lalu buka `https://domain-anda.ngrok-free.dev/docs` di browser (lanjutkan halaman peringatan ngrok jika muncul). Jika dokumentasi FastAPI terbuka, tunnel dapat dijangkau. Setelah memasang APK release terbaru, masuk dengan akun website dan cocokkan data dashboard. Jika muncul `Failed to fetch`, periksa proses backend/ngrok dan URL di `.env`, lalu ulangi `npm run android:apk:release`; mengubah `.env` saja tidak memperbarui APK yang sudah terpasang.
+
+Referensi: [domain dev ngrok tetap](https://ngrok.com/docs/gateway/domains), [header untuk melewati halaman peringatan ngrok](https://ngrok.com/docs/pricing-limits/free-plan-limits), dan [environment/mode Vite](https://vite.dev/guide/env-and-mode).
+
+#### Pengujian lokal khusus Android Emulator
+
+Untuk mencoba login dan pendaftaran di **Android Emulator tanpa ngrok**, jalankan backend FastAPI di komputer pada port 8000, lalu dari direktori proyek jalankan:
+
+```powershell
+npm run build:android:emulator
+npx cap run android
+```
+
+Perintah pertama menggunakan [.env.android-emulator](./.env.android-emulator), yang menimpa URL dari `.env` khusus mode ini. Emulator mengakses backend komputer melalui `http://10.0.2.2:8000`. Izin HTTP hanya diaktifkan pada build Android debug. Alamat ini tidak dapat dipakai HP lain; gunakan kembali `npm run android:apk:release` sebelum membagikan APK.
 
 ---
 
